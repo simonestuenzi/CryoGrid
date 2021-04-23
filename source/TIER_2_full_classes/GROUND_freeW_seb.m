@@ -4,7 +4,7 @@
 % S. Westermann, October 2020
 %========================================================================
 
-classdef GROUND_freeW_seb < SEB & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL %& INITIALIZE
+classdef GROUND_freeW_seb < SEB2 & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL %& INITIALIZE
 
     
     methods
@@ -87,7 +87,7 @@ classdef GROUND_freeW_seb < SEB & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL %& INITI
             ground.TEMP.d_energy = ground.STATVAR.energy.*0;
             
             %new
-            %ground.STATVAR.airT_height = ground.PARA.airT_height;
+            ground.STATVAR.airT_height = ground.PARA.airT_height;
             
         end
         
