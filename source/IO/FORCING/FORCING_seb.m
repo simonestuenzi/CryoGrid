@@ -43,13 +43,9 @@ classdef FORCING_seb < matlab.mixin.Copyable
             forcing.PARA.end_time = [];   % end time of the simulations (must be within the range of data in forcing file)
             forcing.PARA.rain_fraction = [];  %rainfall fraction assumed in sumulations (rainfall from the forcing data file is multiplied by this parameter)
             forcing.PARA.snow_fraction = [];  %snowfall fraction assumed in sumulations (snowfall from the forcing data file is multiplied by this parameter)
-%             forcing.PARA.latitude = [];  % latitude
-%             forcing.PARA.longitude = []; % longitude
-%             forcing.PARA.altitude = [];  % elevation above sea level [m]
-%             forcing.PARA.domain_depth = []; % total depth of the model domain [m]
             forcing.PARA.heatFlux_lb = [];  % heat flux at the lower boundary [W/m2] - positive values correspond to energy gain
-            forcing.PARA.airT_height = [];  % height above ground at which air temperature (and wind speed!) from the forcing data are applied.
-%             forcing.PARA.area = [];         % area of the grid cell [m2] 
+            forcing.PARA.airT_height = [];  % height above ground at which air temperature  from the forcing data are applied.
+            forcing.PARA.wind_height = [];  % height above ground at which wind speed from the forcing data are applied.
         end
         
         
@@ -61,13 +57,7 @@ classdef FORCING_seb < matlab.mixin.Copyable
         function forcing = provide_STATVAR(forcing)
             
         end
-        
-%         function forcing = initialize_excel(forcing)
-%             
-%         end
-        
-       
-        
+
         
         function forcing = finalize_init(forcing, tile)
           
@@ -136,6 +126,8 @@ classdef FORCING_seb < matlab.mixin.Copyable
             forcing.TEMP.wind=0;
             forcing.TEMP.q=0;
             forcing.TEMP.p=0;
+            forcing.TEMP.airT_height =  forcing.PARA.airT_height;  % height above ground at which air temperature  from the forcing data are applied.
+            forcing.TEMP.wind_height = forcing.PARA.wind_height;
         end
         
         function forcing = interpolate_forcing(forcing, tile)

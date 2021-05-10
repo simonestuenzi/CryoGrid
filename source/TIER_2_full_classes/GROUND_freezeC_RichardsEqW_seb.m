@@ -126,8 +126,11 @@ classdef GROUND_freezeC_RichardsEqW_seb < SEB & HEAT_CONDUCTION & FREEZE_CURVE_K
         function ground = finalize_init(ground, tile)
             ground.PARA.heatFlux_lb = tile.FORCING.PARA.heatFlux_lb;
             ground.PARA.airT_height = tile.FORCING.PARA.airT_height;
-            ground.STATVAR.area = tile.PARA.area + ground.STATVAR.T .* 0;
+
+            ground.STATVAR.airT_height = tile.FORCING.PARA.airT_height;
+            ground.STATVAR.wind_height = tile.FORCING.PARA.wind_height;
             
+            ground.STATVAR.area = tile.PARA.area + ground.STATVAR.T .* 0;
             
             ground.CONST.vanGen_alpha = [ ground.CONST.alpha_sand ground.CONST.alpha_silt ground.CONST.alpha_clay ground.CONST.alpha_peat ground.CONST.alpha_water];
             ground.CONST.vanGen_n = [ ground.CONST.n_sand ground.CONST.n_silt ground.CONST.n_clay ground.CONST.n_peat ground.CONST.n_water];

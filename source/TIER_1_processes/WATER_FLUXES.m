@@ -26,7 +26,8 @@ classdef WATER_FLUXES < BASE
                 double(rainfall > -evap) .* (-evap + (rainfall + evap) .* reduction_factor_in(saturation_first_cell, ground));
             ground.TEMP.surface_runoff = rainfall - ground.TEMP.F_ub_water;
             
-            ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            %ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            ground.TEMP.T_rainWater =  max(0,ground.STATVAR.T2m);
             ground.TEMP.F_ub_water_energy = ground.TEMP.F_ub_water .* ground.CONST.c_w .* ground.TEMP.T_rainWater;
             
             ground.TEMP.d_water(1) = ground.TEMP.d_water(1) + ground.TEMP.F_ub_water;
@@ -57,7 +58,8 @@ classdef WATER_FLUXES < BASE
                 double(rainfall > -evap) .* (-evap + (rainfall + evap) .* reduction_factor_in(saturation_first_cell, ground));
             ground.TEMP.surface_runoff = rainfall - ground.TEMP.F_ub_water + excessRain;
             
-            ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            %ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            ground.TEMP.T_rainWater =  max(0,ground.STATVAR.T2m);
             ground.TEMP.F_ub_water_energy = ground.TEMP.F_ub_water .* ground.CONST.c_w .* ground.TEMP.T_rainWater;
             
             ground.TEMP.d_water(1) = ground.TEMP.d_water(1) + ground.TEMP.F_ub_water;
@@ -84,7 +86,8 @@ classdef WATER_FLUXES < BASE
                 double(rainfall > -evap) .* (-evap + (rainfall + evap) .* reduction_factor_in(saturation_first_cell, ground));
             ground.TEMP.F_ub_Xwater = rainfall - ground.TEMP.F_ub_water;
             
-            ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            %ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            ground.TEMP.T_rainWater =  max(0,ground.STATVAR.T2m);
             ground.TEMP.F_ub_water_energy = ground.TEMP.F_ub_water .* ground.CONST.c_w .* ground.TEMP.T_rainWater;
             ground.TEMP.F_ub_Xwater_energy = ground.TEMP.F_ub_Xwater .* ground.CONST.c_w .* ground.TEMP.T_rainWater;
             
@@ -105,7 +108,8 @@ classdef WATER_FLUXES < BASE
             
             ground.TEMP.F_ub_water = rainfall;
             
-            ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            %ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            ground.TEMP.T_rainWater =  max(0,ground.STATVAR.T2m);
             ground.TEMP.F_ub_water_energy = ground.TEMP.F_ub_water .* ground.CONST.c_w .* ground.TEMP.T_rainWater;
             
             ground.TEMP.d_water(1) = ground.TEMP.d_water(1) + ground.TEMP.F_ub_water;
@@ -126,7 +130,8 @@ classdef WATER_FLUXES < BASE
             ground.TEMP.F_ub_water = rainfall .* reduction_factor_in(saturation_first_cell, ground);
             ground.TEMP.surface_runoff = rainfall - ground.TEMP.F_ub_water;  %route this to surface pool
             
-            ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            %ground.TEMP.T_rainWater =  max(0,forcing.TEMP.Tair);
+            ground.TEMP.T_rainWater =  max(0,ground.STATVAR.T2m);
             ground.TEMP.F_ub_water_energy = ground.TEMP.F_ub_water .* ground.CONST.c_w .* ground.TEMP.T_rainWater;
             
             ground.TEMP.d_water(1) = ground.TEMP.d_water(1) + ground.TEMP.F_ub_water;
@@ -139,8 +144,10 @@ classdef WATER_FLUXES < BASE
             snowfall = forcing.TEMP.snowfall ./ 1000 ./ 24 ./3600 .* ground.STATVAR.area(1);
             ground.TEMP.F_ub_water = rainfall + snowfall;
             
-            T_rainWater =  max(0,forcing.TEMP.Tair);
-            T_snow = min(0,forcing.TEMP.Tair);
+            %T_rainWater =  max(0,forcing.TEMP.Tair);
+            T_rainWater =  max(0,ground.STATVAR.T2m);
+            %T_snow = min(0,forcing.TEMP.Tair);
+            T_snow = min(0,ground.STATVAR.T2m);
             ground.TEMP.F_ub_water_energy = rainfall .* ground.CONST.c_w .* T_rainWater + snowfall .* (ground.CONST.c_i .* T_snow - ground.CONST.L_f); 
             
             ground.TEMP.d_water(1) = ground.TEMP.d_water(1) + ground.TEMP.F_ub_water;
@@ -152,7 +159,8 @@ classdef WATER_FLUXES < BASE
             rainfall = forcing.TEMP.rainfall ./ 1000 ./ 24 ./3600 .* ground.STATVAR.area(1);  
             ground.TEMP.F_ub_water = rainfall;
             
-            T_rainWater =  max(0,forcing.TEMP.Tair);
+            %T_rainWater =  max(0,forcing.TEMP.Tair);
+            T_rainWater =  max(0,ground.STATVAR.T2m);
             ground.TEMP.F_ub_water_energy = rainfall .* ground.CONST.c_w .* T_rainWater;
             
             ground.TEMP.d_water(1) = ground.TEMP.d_water(1) + ground.TEMP.F_ub_water;

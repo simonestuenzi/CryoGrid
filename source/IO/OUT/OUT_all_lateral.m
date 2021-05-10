@@ -139,7 +139,7 @@ classdef OUT_all_lateral < matlab.mixin.Copyable
                 %---
                 
                 out.OUTPUT_TIME = out.OUTPUT_TIME + out.PARA.output_timestep;
-                if t==out.SAVE_TIME 
+                if t>=out.SAVE_TIME-1e-10
                    if ~(exist([result_path run_name])==7)
                        mkdir([result_path run_name])
                    end

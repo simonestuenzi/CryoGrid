@@ -99,6 +99,10 @@ classdef LAKE_simple_seb < SEB & HEAT_CONDUCTION & LAKE %& INITIALIZE
         function ground = finalize_init(ground, tile)
             ground.PARA.heatFlux_lb = tile.FORCING.PARA.heatFlux_lb;
             ground.PARA.airT_height = tile.FORCING.PARA.airT_height;
+            
+            ground.STATVAR.airT_height = tile.FORCING.PARA.airT_height;
+            ground.STATVAR.wind_height = tile.FORCING.PARA.wind_height;
+            
             ground.STATVAR.area = tile.PARA.area + ground.STATVAR.T .* 0;
             
             ground = get_E_freeW(ground);

@@ -106,6 +106,10 @@ classdef GROUND_freezeC_seb < SEB & HEAT_CONDUCTION & FREEZE_CURVE_KarraPainter 
         function ground = finalize_init(ground, tile)
             ground.PARA.heatFlux_lb = tile.FORCING.PARA.heatFlux_lb;
             ground.PARA.airT_height = tile.FORCING.PARA.airT_height;
+            
+            ground.STATVAR.airT_height = tile.FORCING.PARA.airT_height;
+            ground.STATVAR.wind_height = tile.FORCING.PARA.wind_height;
+            
             ground.STATVAR.area = tile.PARA.area + ground.STATVAR.T .* 0;
             
             ground.CONST.vanGen_alpha = [ ground.CONST.alpha_sand ground.CONST.alpha_silt ground.CONST.alpha_clay ground.CONST.alpha_peat ground.CONST.alpha_water];

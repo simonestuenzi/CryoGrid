@@ -81,6 +81,8 @@ classdef GROUND_fcSimple_salt_seb < SEB & HEAT_CONDUCTION & SALT & HEAT_FLUXES_L
             ground.PARA.heatFlux_lb = tile.FORCING.PARA.heatFlux_lb;
             ground.PARA.airT_height = tile.FORCING.PARA.airT_height;
             ground.STATVAR.area = tile.PARA.area + ground.STATVAR.T .* 0;
+            ground.STATVAR.airT_height = tile.FORCING.PARA.airT_height;
+            ground.STATVAR.wind_height = tile.FORCING.PARA.wind_height;
             
             ground = get_E_water_salt_FreezeDepress_Xice(ground); %calculate energy, water and ice contents and brine salt concentration
             ground = conductivity(ground); %calculate thermal conductivity

@@ -13,7 +13,7 @@ classdef SEB < BASE
         function seb = L_star(seb, forcing)
 
             uz = forcing.TEMP.wind;
-            z =  seb.PARA.airT_height;
+            z =  forcing.TEMP.wind_height;
             z0 = seb.PARA.z0;
             Tz = forcing.TEMP.Tair+273.15;
             Lstar = seb.STATVAR.Lstar;
@@ -35,6 +35,7 @@ classdef SEB < BASE
             u_star = real(uz.*kappa./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar)));
             L_star = real(-rho.*cp.*Tz./kappa./g.*u_star.^3./(Qh + 0.61.*cp./L.*Tz.*Qe));
             L_star=(abs(L_star)<1e-7).*L_star./abs(L_star).*1e-7 + (abs(L_star)>=1e-7).*L_star;  %limits Lstar
+            L_star = real(L_star);
             
             seb.STATVAR.Lstar = L_star;
             seb.STATVAR.u_star = u_star;
@@ -70,7 +71,8 @@ classdef SEB < BASE
             q = forcing.TEMP.q;
             Tz = forcing.TEMP.Tair;
 
-            z =  seb.PARA.airT_height;
+            z =  forcing.TEMP.airT_height;
+            z_wind = forcing.TEMP.wind_height;
             z0 = seb.PARA.z0;
             rs = seb.PARA.rs;
             kappa = seb.CONST.kappa;
@@ -86,11 +88,19 @@ classdef SEB < BASE
             L_i = latent_heat_sublimation(seb, TForcing); % 1e3.*2834.1; %latent heat of sublimation
             
             if TForcing<=273.15
-                Q_e = -rho.*L_i.*kappa.*uz.*kappa./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar)).*(q-satPresIce(seb, TForcing)./p)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
+                Q_e = -rho.*L_i.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar)).*(q-satPresIce(seb, TForcing)./p)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
+                %seb.STATVAR.q2m = q - seb.STATVAR.Qe ./ (-rho.*L_i.*kappa.*uz.*kappa./(log(z_wind./2)- psi_M(seb, z_wind./Lstar, 2./Lstar))./(log(z./2)- psi_H(seb, z./Lstar, 2./Lstar)));
+                q_surface = q - seb.STATVAR.Qe ./ (-rho.*L_i.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)));
+                seb.STATVAR.q2m = real(q_surface + (q - q_surface) .* (log(2./z0)- psi_H(seb, 2./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)) );
+          
             else
-                Q_e = -rho.*L_w.*kappa.*uz.*kappa./(log(z./z0)- psi_M(seb,z./Lstar, z0./Lstar)).*(q-satPresWater(seb, TForcing)./p)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)  ...
-                    + rs.*uz.*kappa.^2./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar)));
+                Q_e = -rho.*L_w.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb,z_wind./Lstar, z0./Lstar)).*(q-satPresWater(seb, TForcing)./p)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)  ...
+                    + rs.*uz.*kappa.^2./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar)));
+                %seb.STATVAR.q2m = q - seb.STATVAR.Qe ./ (-rho.*L_w.*kappa.*uz.*kappa./(log(z_wind./2)- psi_M(seb, z_wind./Lstar, 2./Lstar))./(log(z./2)- psi_H(seb, z./Lstar, 2./Lstar)));
+                q_surface = q - seb.STATVAR.Qe ./ (-rho.*L_w.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)));
+                seb.STATVAR.q2m = real(q_surface + (q - q_surface) .* (log(2./z0)- psi_H(seb, 2./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)) );
             end
+            seb.STATVAR.q_forcing = q;
         end
         
         %latent heat flux for potential evapotranspiration
@@ -101,7 +111,8 @@ classdef SEB < BASE
             q = forcing.TEMP.q;
             Tz = forcing.TEMP.Tair;
             
-            z =  seb.PARA.airT_height;
+            z =  forcing.TEMP.airT_height;
+            z_wind = forcing.TEMP.wind_height;
             z0 = seb.PARA.z0;
             kappa = seb.CONST.kappa;
                         
@@ -115,10 +126,18 @@ classdef SEB < BASE
             L_i = latent_heat_sublimation(seb, TForcing); % 1e3.*2834.1; %latent heat of sublimation
 
             if TForcing<=273.15
-                Q_e = -rho.*L_i.*kappa.*uz.*kappa./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar)).*(q-satPresIce(seb, TForcing)./p)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
+                Q_e = -rho.*L_i.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar)).*(q-satPresIce(seb, TForcing)./p)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
+                %seb.STATVAR.q2m = q - seb.STATVAR.Qe ./ (-rho.*L_i.*kappa.*uz.*kappa./(log(z_wind./2)- psi_M(seb, z_wind./Lstar, 2./Lstar))./(log(z./2)- psi_H(seb, z./Lstar, 2./Lstar)));
+                q_surface = q - seb.STATVAR.Qe ./ (-rho.*L_i.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)));
+                seb.STATVAR.q2m = real(q_surface + (q - q_surface) .* (log(2./z0)- psi_H(seb, 2./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)) );
             else
-                Q_e = -rho.*L_w.*kappa.*uz.*kappa./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar)).*(q-satPresWater(seb, TForcing)./p)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
+                Q_e = -rho.*L_w.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar)).*(q-satPresWater(seb, TForcing)./p)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
+                %seb.STATVAR.q2m = q - seb.STATVAR.Qe ./ (-rho.*L_w.*kappa.*uz.*kappa./(log(z_wind./2)- psi_M(seb, z_wind./Lstar, 2./Lstar))./(log(z./2)- psi_H(seb, z./Lstar, 2./Lstar)));
+                q_surface = q - seb.STATVAR.Qe ./ (-rho.*L_w.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)));
+                seb.STATVAR.q2m = real(q_surface + (q - q_surface) .* (log(2./z0)- psi_H(seb, 2./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)) );
             end
+            seb.STATVAR.q_forcing = q;
+            
         end
         
         
@@ -132,7 +151,8 @@ classdef SEB < BASE
             Tz = forcing.TEMP.Tair;
             Lstar = seb.STATVAR.Lstar;
             
-            z =  seb.PARA.airT_height;
+            z =  forcing.TEMP.airT_height;
+            z_wind = forcing.TEMP.wind_height;
             z0 = seb.PARA.z0;
             kappa = seb.CONST.kappa; 
             
@@ -161,12 +181,18 @@ classdef SEB < BASE
 %             vol_water_first_cell
 %             betaCLM4_5
 
-            seb.STATVAR.Qe = -rho.*latent_heat.*betaCLM4_5.*kappa.*uz.*kappa./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar)).*(q - q_first_cell)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
+            seb.STATVAR.Qe = -rho.*latent_heat.*betaCLM4_5.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar)).*(q - q_first_cell)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
             seb.STATVAR.evap = water_fraction .* seb.STATVAR.Qe ./ (latent_heat .* seb.CONST.rho_w);
             seb.STATVAR.sublim = ice_fraction .* seb.STATVAR.Qe ./ (latent_heat .* seb.CONST.rho_w);
             seb.STATVAR.evap_energy =  seb.STATVAR.evap.*  (double(seb.STATVAR.T(1,1)>=0) .* seb.CONST.c_w .* seb.STATVAR.T(1,1) + ...
                 double(seb.STATVAR.T(1,1)<0) .* seb.CONST.c_i .* seb.STATVAR.T(1,1)); 
             seb.STATVAR.sublim_energy =  seb.STATVAR.sublim .* (seb.CONST.c_i .* seb.STATVAR.T(1,1) - seb.CONST.L_f); 
+            
+            %calculate 2m q
+            q_surface = q - seb.STATVAR.Qe ./ (-rho.*latent_heat.*kappa.*uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar))); 
+            
+            seb.STATVAR.q2m = real(q_surface + (q - q_surface) .* (log(2./z0)- psi_H(seb, 2./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)) );
+            seb.STATVAR.q_forcing = q;
         end
         
         
@@ -179,19 +205,36 @@ classdef SEB < BASE
             sigma = seb.CONST.sigma; 
             
             uz = forcing.TEMP.wind;
-            z =  seb.PARA.airT_height;
+            z =  forcing.TEMP.airT_height;
+            z_wind = forcing.TEMP.wind_height;
             z0 = seb.PARA.z0;
             Tz = forcing.TEMP.Tair;
-            TForcing = seb.STATVAR.T(1);
+            T_surface = seb.STATVAR.T(1);
             Lstar = seb.STATVAR.Lstar;
             p = forcing.TEMP.p;
-                        
-            Tz=Tz+273.15;
-            TForcing=TForcing+273.15;
-            rho = rho_air(seb, p, Tz);
-
-            Q_h  = -rho.*cp.*kappa.* uz.*kappa./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar)) .* (Tz-TForcing)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
             
+            Tz=Tz+273.15;
+            T_surface=T_surface+273.15;
+            rho = rho_air(seb, p, Tz);
+            
+            Q_h  = -rho.*cp.*kappa.* uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar)) .* (Tz-T_surface)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
+            Q_h = real(Q_h);
+            
+            %calculate 2m airT and 10m wind speed
+            
+           % seb.STATVAR.T2m = real(T_surface + seb.STATVAR.Qh ./ (-rho.*cp.*kappa.* uz.*kappa./(log(2 ./ z0) - psi_M(seb, 2./Lstar, z0 ./Lstar)) ./ (log(2./z0)- psi_H(seb, 2./Lstar, z0./Lstar))));
+           
+           seb.STATVAR.T2m = real(T_surface + (Tz - T_surface) .* (log(2./z0)- psi_H(seb, 2./Lstar, z0./Lstar))./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar)) );
+            
+            seb.STATVAR.T2m = seb.STATVAR.T2m  - 273.15;
+            
+            %u_star = uz.*kappa./(log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar));
+            %seb.STATVAR.wind10m = uz - u_star ./ (kappa./(log(z_wind./10)- psi_M(seb, z_wind./Lstar, 10./Lstar))); 
+            %seb.STATVAR.wind10m = u_star ./ (kappa./(log(10./z0)- psi_M(seb, 10./Lstar, z0./Lstar)));
+            seb.STATVAR.wind10m = uz - uz  .* ((log(z_wind./10)- psi_M(seb, z_wind./Lstar, 10./Lstar)) ./ (log(z_wind./z0)- psi_M(seb, z_wind./Lstar, z0./Lstar)) );             
+            seb.STATVAR.Lin = forcing.TEMP.Lin;
+            seb.STATVAR.Sin = forcing.TEMP.Sin;
+
         end
         
         function rho = rho_air(seb, p, T) %air density [kg m^(-3)]

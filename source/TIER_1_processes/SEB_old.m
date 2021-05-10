@@ -5,7 +5,7 @@
 %========================================================================
 
 
-classdef SEB2 < BASE
+classdef SEB < BASE
     
     methods
         
@@ -179,26 +179,16 @@ classdef SEB2 < BASE
             sigma = seb.CONST.sigma; 
             
             uz = forcing.TEMP.wind;
-            z =  seb.STATVAR.airT_height;
+            z =  seb.PARA.airT_height;
             z0 = seb.PARA.z0;
             Tz = forcing.TEMP.Tair;
             TForcing = seb.STATVAR.T(1);
             Lstar = seb.STATVAR.Lstar;
             p = forcing.TEMP.p;
-            
+                        
             Tz=Tz+273.15;
             TForcing=TForcing+273.15;
             rho = rho_air(seb, p, Tz);
-            
-            %calculate 2m airT and 10m wind speed
-            
-            seb.STATVAR.T2m = real(Tz - seb.STATVAR.Qh ./ (-rho.*cp.*kappa.* uz.*kappa./(log(z ./ 2)- psi_M(seb, z./Lstar, 2 ./Lstar)) ./(log(z./2)- psi_H(seb, z./Lstar, 2./Lstar))));
-            seb.STATVAR.T2m = seb.STATVAR.T2m  - 273.15;
-            u_star = uz.*kappa./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar));
-            seb.STATVAR.wind10m = u_star ./ (kappa./(log(10./z0)- psi_M(seb, 10./Lstar, z0./Lstar)));
-            
-            seb.STATVAR.T200m =forcing.TEMP.Tair;
-            seb.STATVAR.wind200m =forcing.TEMP.wind;
 
             Q_h  = -rho.*cp.*kappa.* uz.*kappa./(log(z./z0)- psi_M(seb, z./Lstar, z0./Lstar)) .* (Tz-TForcing)./(log(z./z0)- psi_H(seb, z./Lstar, z0./Lstar));
             

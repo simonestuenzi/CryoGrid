@@ -4,7 +4,7 @@
 % S. Westermann, October 2020
 %========================================================================
 
-classdef GROUND_freeW_seb < SEB2 & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL %& INITIALIZE
+classdef GROUND_freeW_seb < SEB & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL %& INITIALIZE
 
     
     methods
@@ -87,8 +87,12 @@ classdef GROUND_freeW_seb < SEB2 & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL %& INIT
             ground.TEMP.d_energy = ground.STATVAR.energy.*0;
             
             %new
-            ground.STATVAR.airT_height = ground.PARA.airT_height;
+            ground.STATVAR.airT_height = tile.FORCING.PARA.airT_height;
+            ground.STATVAR.wind_height = tile.FORCING.PARA.wind_height;
             
+            ground.STATVAR.T2m = 5;
+            ground.STATVAR.wind10m = 5;
+            ground.STATVAR.q2m = 0.005;
         end
         
         

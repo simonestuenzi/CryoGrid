@@ -168,8 +168,10 @@ classdef SNOW < BASE
         %properties of new snow CROCUS, Vionnet et al., 2012
         function snow = get_snow_properties_crocus(snow,forcing)
             if snow.TEMP.snowfall >0
-                T_air=min(forcing.TEMP.Tair, 0);
-                windspeed = forcing.TEMP.wind;
+                %T_air=min(forcing.TEMP.Tair, 0);
+                T_air=min(snow.STATVAR.T2m, 0);
+                %windspeed = forcing.TEMP.wind;
+                windspeed = snow.STATVAR.wind10m;
                 
                 T_fus=0;  %degree C
                 a_rho=109;  %kg/m3

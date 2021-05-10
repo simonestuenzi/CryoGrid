@@ -105,6 +105,9 @@ classdef SNOW_crocus_bucketW_seb < SEB & HEAT_CONDUCTION & WATER_FLUXES & HEAT_F
             snow.PARA.heatFlux_lb = tile.FORCING.PARA.heatFlux_lb;
             snow.PARA.airT_height = tile.FORCING.PARA.airT_height;
             
+            snow.STATVAR.airT_height = tile.FORCING.PARA.airT_height;
+            snow.STATVAR.wind_height = tile.FORCING.PARA.wind_height;
+            
             snow = initialize_zero_snow_BASE(snow);  %initialize all values to be zero
             snow.PARA.spectral_ranges = [snow.PARA.SW_spectral_range1 snow.PARA.SW_spectral_range2 1 - snow.PARA.SW_spectral_range1 - snow.PARA.SW_spectral_range2];
             
@@ -127,8 +130,8 @@ classdef SNOW_crocus_bucketW_seb < SEB & HEAT_CONDUCTION & WATER_FLUXES & HEAT_F
             snow = surface_energy_balance(snow, forcing);
             snow = get_sublimation(snow, forcing);
             
-            snow.TEMP.wind = forcing.TEMP.wind;
-            snow.TEMP.wind_surface = forcing.TEMP.wind;
+            snow.TEMP.wind = snow.STATVAR.wind10m; %forcing.TEMP.wind;
+            snow.TEMP.wind_surface = snow.STATVAR.wind10m; %forcing.TEMP.wind;
         end
         
         function snow = get_boundary_condition_u_CHILD(snow, tile)
@@ -141,12 +144,21 @@ classdef SNOW_crocus_bucketW_seb < SEB & HEAT_CONDUCTION & WATER_FLUXES & HEAT_F
             snow = surface_energy_balance(snow, forcing); %this works including penetration of SW radiation through the CHILD snow
             snow = get_sublimation(snow, forcing);
             
-            snow.TEMP.wind = forcing.TEMP.wind;
-            snow.TEMP.wind_surface = forcing.TEMP.wind;
+            snow.STATVAR.T2m = snow.PARENT.STATVAR.T2m;
+            snow.STATVAR.wind10m = snow.PARENT.STATVAR.wind10m;
+            
+            
+            snow.TEMP.wind = snow.STATVAR.wind10m; %forcing.TEMP.wind;
+            snow.TEMP.wind_surface = snow.STATVAR.wind10m; %forcing.TEMP.wind;
         end
         
         function snow = get_boundary_condition_u_create_CHILD(snow, tile)
             forcing = tile.FORCING;
+            
+            snow.STATVAR.T2m = snow.PARENT.STATVAR.T2m;
+            snow.STATVAR.wind10m = snow.PARENT.STATVAR.wind10m;
+            snow.STATVAR.q2m = snow.PARENT.STATVAR.q2m;
+            
             snow = get_boundary_condition_allSNOW_u(snow, forcing); %add all snow, no rain
             
             snow = get_snow_properties_crocus(snow,forcing);
@@ -188,6 +200,7 @@ classdef SNOW_crocus_bucketW_seb < SEB & HEAT_CONDUCTION & WATER_FLUXES & HEAT_F
             snow.STATVAR.ice = 0;
             snow.STATVAR.excessWater = 0;
             snow.STATVAR.upperPos = snow.PARENT.STATVAR.upperPos;
+
         end
         
        function [snow, S_up] = penetrate_SW(snow, S_down)  %mandatory function when used with class that features SW penetration
