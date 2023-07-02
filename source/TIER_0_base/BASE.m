@@ -158,6 +158,11 @@ classdef BASE < matlab.mixin.Copyable
             yesNo = 1;
         end
         
+        %for data assimilation in TILE_1D_DA
+        function ground = adjust_stratigraphy(ground, tile)
+            
+        end
+        
         %-------------param file generation-----
         function ground = param_file_info(ground)
              ground = provide_PARA(ground);

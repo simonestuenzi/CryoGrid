@@ -5,7 +5,7 @@
 % S. Westermann, October 2020
 %========================================================================
 
-classdef GROUND_freeW_seb < SEB & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL 
+classdef GROUND_freeW_seb < SEB & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL & ADJUST_STRATIGRAPHY
     
     methods
         
@@ -186,6 +186,12 @@ classdef GROUND_freeW_seb < SEB & HEAT_CONDUCTION & HEAT_FLUXES_LATERAL
             ground = lateral3D_push_heat_simple(ground, lateral);
         end
         
+        %----ADJUST_STRATIGRAPHY-------------
+        %needed to change the stratigraphy during data assimilation
+        
+        function ground = adjust_stratigraphy(ground, tile)
+            ground = adjust_stratigraphy_waterIce_fixed(ground, tile);
+        end
         
                  
          %-------------param file generation-----

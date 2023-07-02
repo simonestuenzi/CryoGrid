@@ -176,6 +176,19 @@ classdef OUT_all_lateral < matlab.mixin.Copyable
             end
         end
         
+        function out = reset_timestamp_out(out,tile)
+            if size(out.TIMESTAMP,2)>0
+                delete_timestamps = find(out.TIMESTAMP(1,:)>tile.t);
+                if ~isempty(delete_timestamps)
+                    
+                    out.STRATIGRAPHY(:,delete_timestamps) = [];
+                    out.LATERAL(:,delete_timestamps) = [];
+                    out.TIMESTAMP(:,delete_timestamps) = [];
+                end
+            end
+            out.OUTPUT_TIME = tile.t + out.PARA.output_timestep;
+        end
+        
         %-------------param file generation-----
         function out = param_file_info(out)
             out = provide_PARA(out);

@@ -24,12 +24,9 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
             da.PARA.assimilation_date = []; %specific date in case of years or months
             da.PARA.start_assimilation_period = []; %Hlist, date from when the assimilation is started, i.e. the initial state
             da.PARA.ensemble_variables = [];
-            da.PARA.learning_coefficient = [];
-            da.PARA.min_ensemble_diversity = [];
+            da.PARA.learning_coefficient_iteration = [];
+            da.PARA.learning_coefficient_forward = [];
             da.PARA.max_iterations = [];
-            da.PARA.store_format = [];
-            da.PARA.store_file_tag = [];
-            da.PARA.recalculate_stratigraphy = 0;
         end
         
         function da = provide_CONST(da)
@@ -55,8 +52,7 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
                 da.STATVAR.modeled_obs{i,1} = da.STATVAR.observations{i,1}.*NaN;
                 da.ENSEMBLE.weights = repmat(1./da.TILE.PARA.ensemble_size, 1, da.TILE.PARA.ensemble_size); %set equal weights before 1st DA step
                 
-                da.OBS_OP{i,1} = copy(tile.RUN_INFO.PPROVIDER.CLASSES.(da.PARA.observable_classes{i,1}){da.PARA.observable_classes_index(i,1)});
-                da.OBS_OP{i,1} = finalize_init(da.OBS_OP{i,1}, tile);
+                da.OBS_OP{i,1} = copy(tile.RUN_INFO.PPROVIDER.CLASSES.(da.PARA.observable_classes{i,1}){da.PARA.observable_classes_index(i,1)});     
                 da.TEMP.first_obs_index = [da.TEMP.first_obs_index; find(da.STATVAR.obs_time{i,1} > tile.t, 1)];
                 da.TEMP.index_next_obs = [da.TEMP.index_next_obs; da.TEMP.first_obs_index(i,1)]; %start with 
                 da.TEMP.time_next_obs = [da.TEMP.time_next_obs; da.STATVAR.obs_time{i,1}(da.TEMP.first_obs_index(i,1),1)];
@@ -85,30 +81,7 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
             end
             
             da.TEMP.num_iterations = 1;
-            
-            %vector of variables that are changedin this DA class
-%             change_yes_no = tile.ENSEMBLE.TEMP.variable_type .* 0;
-%             for i=1:size(da.PARA.ensemble_variables,1)
-%                 pos = find(strcmp(da.PARA.ensemble_variables{i,1}, tile.ENSEMBLE.TEMP.variable_name));
-%                 if ~isempty(pos)
-%                     change_yes_no(pos,1) = 1;
-%                 end
-%             end
-%             da.TEMP.change_yes_no = change_yes_no;
-            
-            %vector of positions to convert between the list of variables
-            %that are changed by the DA to the full list of perturbed
-            %variables in ENSEMBLE
-            pos_in_ensemble = [];
-            for i=1:size(da.PARA.ensemble_variables,1)
-                 pos_in_ensemble = [pos_in_ensemble; find(strcmp(da.PARA.ensemble_variables{i,1}, tile.ENSEMBLE.TEMP.variable_name))];
-            end
-            da.TEMP.pos_in_ensemble = pos_in_ensemble;
-
-            da.TEMP.recalculate_stratigraphy_now = 0;
         end
-        
-        
         
         function da = DA_step(da, tile)
             %save the state and the ensemble variables when the DA begins,
@@ -118,9 +91,9 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
                 da.TEMP.assimilation_started = 1;
                 da.ENSEMBLE.weights_old = da.ENSEMBLE.weights;
                 da = save_state(da, tile); %save states at the start of the assimilation period 
-                da.TEMP.old_value_gaussian = tile.ENSEMBLE.TEMP.value_gaussian(da.TEMP.pos_in_ensemble,1);
-                da.TEMP.old_mean_gaussian = tile.ENSEMBLE.TEMP.mean_gaussian(da.TEMP.pos_in_ensemble,1);
-                da.TEMP.old_std_gaussian = tile.ENSEMBLE.TEMP.std_gaussian(da.TEMP.pos_in_ensemble,1);
+                for i=1:size(da.PARA.ensemble_variables,1)
+                    da.TEMP.old_ensemble.(da.PARA.ensemble_variables{i,1}) = get_variable_info(tile.ENSEMBLE, da.PARA.ensemble_variables{i,1});
+                end
             end
             
             if da.TEMP.assimilation_started && tile.t>= da.DA_TIME
@@ -156,11 +129,14 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
                 da.ENSEMBLE.modeled_obs = repmat(modeled_obs, 1, da.TILE.PARA.ensemble_size) .* NaN;
                 da.ENSEMBLE.modeled_obs(:, da.TILE.PARA.worker_number) = modeled_obs;
                 
-                value_gaussian = tile.ENSEMBLE.TEMP.value_gaussian(da.TEMP.pos_in_ensemble,1); 
-                data_package = pack(da, data_package, 'value_gaussian', value_gaussian);
-
-                da.ENSEMBLE.value_gaussian = repmat(value_gaussian, 1, da.TILE.PARA.ensemble_size) .* NaN;
-                da.ENSEMBLE.value_gaussian(:, da.TILE.PARA.worker_number) = value_gaussian;
+                ensemble_param = []; %gather ensemble parameters in one vector
+                variables = fieldnames(da.TILE.ENSEMBLE.STATVAR);
+                for j=1:size(variables,1)
+                    ensemble_param = [ensemble_param; da.TILE.ENSEMBLE.STATVAR.(variables{j,1})];
+                end
+                data_package = pack(da, data_package, 'ensemble_param', ensemble_param);
+                da.ENSEMBLE.ensemble_param = repmat(ensemble_param, 1, da.TILE.PARA.ensemble_size) .* NaN;
+                da.ENSEMBLE.ensemble_param(:, da.TILE.PARA.worker_number) = ensemble_param;
                 
                 %send
                 for i = 1:da.TILE.PARA.ensemble_size
@@ -178,47 +154,54 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
                     end
                 end
                 
-                
                 %actual DA 
-
-                if da.TEMP.num_iterations == 1
-                    da = PBS(da);
-                else
-                    da = adaptive_PBS(da);
-                end
-                    
-                if strcmp(da.PARA.store_format, 'all') && da.TILE.PARA.worker_number==1
-                    da_store = copy(da);
-                    da_store.TILE = [];
-                    if isempty(da.PARA.store_file_tag) || isnan(da.PARA.store_file_tag)
-                        save([tile.PARA.result_path tile.PARA.run_name '/' 'da_store_'  datestr(tile.t, 'yyyymmdd') '_' num2str(da.TEMP.num_iterations)  '.mat'], 'da_store')
-                    else
-                        save([tile.PARA.result_path tile.PARA.run_name '/' 'da_store_'  datestr(tile.t, 'yyyymmdd') '_' num2str(da.TEMP.num_iterations) '_' da.PARA.store_file_tag '.mat'], 'da_store')
-                    end
+                da = PBS(da);
+                
+                %MAKE THIS PART OF the OUT class
+                if da.TILE.PARA.worker_number==1
+                    test= copy(da);
+                    test.TILE = [];
+                    save('test.mat', 'test')
                 end
                 
-                if da.ENSEMBLE.effective_ensemble_size./tile.PARA.ensemble_size >= da.PARA.min_ensemble_diversity || da.TEMP.num_iterations>=da.PARA.max_iterations
-                    %do not iterate, but move on in time, do a normal
-                    %resampling of model state and resample
-                    %parameters according to the learning coefficient
-                    
-                    
-                    if strcmp(da.PARA.store_format, 'final') && da.TILE.PARA.worker_number==1
-                        da_store = copy(da);
-                        da_store.TILE = [];
-                        if isempty(da.PARA.store_file_tag) || isnan(da.PARA.store_file_tag)
-                            save([tile.PARA.result_path tile.PARA.run_name '/' 'da_store_'  datestr(tile.t, 'yyyymmdd') '.mat'], 'da_store')
-                        else
-                            save([tile.PARA.result_path tile.PARA.run_name '/' 'da_store_' datestr(tile.t, 'yyyymmdd') '_' da.PARA.store_file_tag '.mat'], 'da_store')
-                        end
-                    end
+                %at this point the weights are known 
+                %1. determine effective sample size
+                %2. if effective sample size > threshold, save the
+                %surviving ensemble members, read them into the ones w.o.
+                %weight and then recompute ensemble parameters according to
+                %defined protocol (learning or non-learning)
+                %3. if effective ensemble size < threshold, do not save
+                %new, but reset timestamps, again read the surviving
+                %ensemble members from the last round, and recompute the
+                %ensemble parameters based on the weights of the surviving ensemble members 
+                
+                effective_ensemble_size = 1./sum(da.ENSEMBLE.weights.^2);
+                
+                if effective_ensemble_size >= da.TILE.PARA.ensemble_size/5 || da.TEMP.num_iterations>=da.PARA.max_iterations
                     
                     da.TEMP.num_iterations = 1;
-                    resample_ID = randsample(da.TILE.PARA.ensemble_size, da.TILE.PARA.ensemble_size, true, da.ENSEMBLE.weights); %replaces "get_from_new_worker"
-                    da = save_state(da, tile);
-                                        
+                    
+                    %resampling from weights
+                    rng(tile.t+25) %use current time as seed for randum number generator, i.e. same sequence of random numbers will be generated by each worker
+                    [weights_sorted, posi] = sort(da.ENSEMBLE.weights);
+                    weights_sorted_cum = cumsum(weights_sorted);
+                    weights_sorted_cum = [0 weights_sorted_cum(1, 1:end-1)];
+                    resample_posi=sum(double(repmat(rand(da.TILE.PARA.ensemble_size,1),1,da.TILE.PARA.ensemble_size) > repmat(weights_sorted_cum, da.TILE.PARA.ensemble_size,1)),2);
+                    get_from_new_worker = [];
+                    for i=1:da.TILE.PARA.ensemble_size
+                        get_from_new_worker=[get_from_new_worker; posi(resample_posi(i))];
+                    end
+                    
+                    %save the stratigraphy vector and all the other TILE info
+                    %in file
+                    if sum(get_from_new_worker==da.TILE.PARA.worker_number)>0
+                        da = save_state(da, tile);
+                    end
+                    
+                    labBarrier;
+                    
                     %read the new stratigraphy and info from file
-                    temp=load([tile.PARA.result_path  da.TEMP.run_name '/tile_' num2str(resample_ID(tile.PARA.worker_number,1)) '.mat']);
+                    temp=load([tile.PARA.result_path  da.TEMP.run_name '/tile_' num2str(get_from_new_worker(da.TILE.PARA.worker_number,1)) '.mat']);
                     variables = fieldnames(temp.state);
                     for i=1:size(variables,1)
                         if ~isempty(temp.state.(variables{i,1}))
@@ -226,28 +209,57 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
                         end
                     end
                     
-                    rand_sequence = rand(1,tile.PARA.ensemble_size);
-                    if da.PARA.learning_coefficient >= rand_sequence(1, tile.PARA.worker_number)
-                        %learning, use the inflation
-                        value_gaussian_resampled = da.ENSEMBLE.value_gaussian(:,resample_ID);  %    thetap=thetap(:,resample);
-                        mean_gaussian_resampled = mean(value_gaussian_resampled,2);   %propm=mean(thetap,2);
-                                              
-                        deviation = value_gaussian_resampled - mean_gaussian_resampled; % A=thetap-propm;
-                        proposal_cov =  (1./tile.PARA.ensemble_size) .* (deviation*deviation');  %   propc=(1/Ne).*(A*A'); % Proposal covariance
-                        % Inflate proposal covariance to avoid overconfidence
-                        
-                        proposal_cov = proposal_cov + 0.1 .* (1 - da.ENSEMBLE.effective_ensemble_size./ tile.PARA.ensemble_size).* diag(da.TEMP.old_std_gaussian); % propc=propc+0.1.*(1-diversity).*pric;
-                        % Gaussian resampling using the Cholesky decomposition
-                        L=chol(proposal_cov,'lower');
-                        Z = randn(size(mean_gaussian_resampled,1), tile.PARA.ensemble_size); %Z=randn(Np,Ne);
-                        value_gaussian_resampled = mean_gaussian_resampled + L*Z;
-                        
-                        tile.ENSEMBLE.TEMP.value_gaussian(da.TEMP.pos_in_ensemble,1) = value_gaussian_resampled(:, tile.PARA.worker_number);
-                    else
-                        tile.ENSEMBLE.TEMP.value_gaussian(da.TEMP.pos_in_ensemble,1) = da.TEMP.old_value_gaussian;
+                    labBarrier;
+                    if sum(get_from_new_worker==da.TILE.PARA.worker_number)>0
+                        delete([tile.PARA.result_path da.TEMP.run_name '/tile_' num2str(da.TILE.PARA.worker_number) '.mat']);
                     end
-                    %call the transform function of ensemble
                     
+                    
+                    %recalculate ensemble parameters
+                    ENSEMBLE_variables = fieldnames(tile.ENSEMBLE.STATVAR);
+                    for i=1:size(ENSEMBLE_variables)
+                        if any(strcmp(ENSEMBLE_variables{i,1}, da.PARA.ensemble_variables)) 
+                            %find out if that variable is to be optimized by this DA class and check learning coefficient if this ensemble member is supposed to learn
+                            if any(strcmp(tile.ENSEMBLE.PARA.gaussian_variables_name, ENSEMBLE_variables{i,1})) %gaussian variable
+                                pos = find(strcmp(tile.ENSEMBLE.PARA.gaussian_variables_name, ENSEMBLE_variables{i,1}));
+                                if da.PARA.learning_coefficient_forward >= rand()
+                                    tile.ENSEMBLE.PARA.gaussian_variables_center(pos,1) = sum(da.ENSEMBLE.ensemble_param(i,:) .* da.ENSEMBLE.weights);
+                                    if effective_ensemble_size >= 3
+                                        a = round(da.ENSEMBLE.weights .* da.TILE.PARA.ensemble_size.*100);
+                                        b=[];
+                                        for k=1:length(a)
+                                            b=[b repmat(da.ENSEMBLE.ensemble_param(i,k), 1, a(1,k))];
+                                        end
+                                        tile.ENSEMBLE.PARA.gaussian_variables_width(pos,1) = std(b);
+                                    end
+                                else
+                                    tile.ENSEMBLE.PARA.gaussian_variables_center(pos,1) = da.TEMP.old_ensemble.(ENSEMBLE_variables{i,1}).gaussian_variables_center;
+                                    tile.ENSEMBLE.PARA.gaussian_variables_width(pos,1) = da.TEMP.old_ensemble.(ENSEMBLE_variables{i,1}).gaussian_variables_width;
+                                end
+                            end
+                            if any(strcmp(tile.ENSEMBLE.PARA.boxcar_variables_name, ENSEMBLE_variables{i,1})) %boxcar variable
+                                pos = find(strcmp(tile.ENSEMBLE.PARA.boxcar_variables_name, ENSEMBLE_variables{i,1}));
+                                if da.PARA.learning_coefficient_forward >= rand()
+                                    if effective_ensemble_size >= 3
+                                        mean_value = sum(da.ENSEMBLE.ensemble_param(i,:) .* da.ENSEMBLE.weights);
+                                        range = tile.ENSEMBLE.PARA.boxcar_variables_upper_bound(pos,1) - tile.ENSEMBLE.PARA.boxcar_variables_lower_bound(pos,1);
+                                        tile.ENSEMBLE.PARA.boxcar_variables_lower_bound(pos,1) = mean_value - range/2;
+                                        tile.ENSEMBLE.PARA.boxcar_variables_upper_bound(pos,1) = mean_value + range/2;
+                                    else
+                                        valid_pos = find(da.ENSEMBLE.weights(1,:) > 1./(100.*da.TILE.PARA.ensemble_size));
+                                        mini = min(da.ENSEMBLE.ensemble_param(i,valid_pos));
+                                        maxi = max(da.ENSEMBLE.ensemble_param(i,valid_pos));
+                                        range = maxi-mini;
+                                        tile.ENSEMBLE.PARA.boxcar_variables_lower_bound(pos,1) = mini - range/2;
+                                        tile.ENSEMBLE.PARA.boxcar_variables_upper_bound(pos,1) = maxi + range/2;
+                                    end
+                                else
+                                    tile.ENSEMBLE.PARA.boxcar_variables_lower_bound(pos,1) = da.TEMP.old_ensemble.(ENSEMBLE_variables{i,1}).boxcar_variables_lower_bound;
+                                    tile.ENSEMBLE.PARA.boxcar_variables_upper_bound(pos,1) = da.TEMP.old_ensemble.(ENSEMBLE_variables{i,1}).boxcar_variables_upper_bound;
+                                end
+                            end
+                        end
+                    end
                     da.TILE.ENSEMBLE = recalculate_ensemble_parameters_after_DA(da.TILE.ENSEMBLE, tile, da.PARA.ensemble_variables);
                     
                     %assign next DA_STEP_TIME
@@ -281,25 +293,17 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
                     da.TEMP.last_assimilation_date = tile.t;
                     da.ENSEMBLE.weights_old = da.ENSEMBLE.weights;
                     da = save_state(da, tile); %save new states at the start of the new assimilation period, so that it can be read again if ensemble is degenerate
-%                     for i=1:size(da.PARA.ensemble_variables,1)
-%                         da.TEMP.old_ensemble.(da.PARA.ensemble_variables{i,1}) = get_variable_info(tile.ENSEMBLE, da.PARA.ensemble_variables{i,1});
-%                     end
-                    
-                    da.TEMP.old_value_gaussian = tile.ENSEMBLE.TEMP.value_gaussian(da.TEMP.pos_in_ensemble,1);
-%                     da.TEMP.old_mean_gaussian = tile.ENSEMBLE.TEMP.mean_gaussian(logical(da.TEMP.change_yes_no),1);
-%                     da.TEMP.old_std_gaussian = tile.ENSEMBLE.TEMP.std_gaussian(logical(da.TEMP.change_yes_no),1);
+                    for i=1:size(da.PARA.ensemble_variables,1)
+                        da.TEMP.old_ensemble.(da.PARA.ensemble_variables{i,1}) = get_variable_info(tile.ENSEMBLE, da.PARA.ensemble_variables{i,1});
+                    end
                     %assimilation successful, ensemble is not degenerate,
                     %move on in time
-                    
                 else
-                    %iterate and go back to start of DA period, resample
-                    %and inflate again, start over with "old" model states
-                    %at the beginning of the DA period
+                    %ensemble is degenerate, start over with old states 
                     disp('ensemble degenerate, one more time')
                     
                     da.TEMP.num_iterations = da.TEMP.num_iterations + 1;
                     
-                    %load "old" state
                     temp=load([tile.PARA.result_path da.TEMP.run_name '/tile_' num2str(da.TILE.PARA.worker_number) '.mat']);
                     variables = fieldnames(temp.state);
                     for i=1:size(variables,1)
@@ -308,25 +312,56 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
                         end
                     end
                     
-                    resample_ID = randsample(da.TILE.PARA.ensemble_size, da.TILE.PARA.ensemble_size, true, da.ENSEMBLE.weights); %replaces "get_from_new_worker"
-                    
-                    value_gaussian_resampled = da.ENSEMBLE.value_gaussian(:,resample_ID);  %    thetap=thetap(:,resample);
-                    mean_gaussian_resampled = mean(value_gaussian_resampled,2);   %propm=mean(thetap,2);
-                    
-                    deviation = value_gaussian_resampled - mean_gaussian_resampled; % A=thetap-propm;
-                    proposal_cov =  (1./tile.PARA.ensemble_size) .* (deviation*deviation');  %   propc=(1/Ne).*(A*A'); % Proposal covariance
-                    % Inflate proposal covariance to avoid overconfidence
-                    
-                    proposal_cov = proposal_cov + 0.1 .* (1 - da.ENSEMBLE.effective_ensemble_size./ tile.PARA.ensemble_size).* diag(da.TEMP.old_std_gaussian); % propc=propc+0.1.*(1-diversity).*pric;
-                    % Gaussian resampling using the Cholesky decomposition
-                    L=chol(proposal_cov,'lower');
-                    Z = randn(size(mean_gaussian_resampled,1), tile.PARA.ensemble_size); %Z=randn(Np,Ne);
-                    value_gaussian_resampled = mean_gaussian_resampled + L*Z;
-
-                    tile.ENSEMBLE.TEMP.value_gaussian(da.TEMP.pos_in_ensemble,1) = value_gaussian_resampled(:, tile.PARA.worker_number);
-                              
+                    %recalculate ensemble parameters, same as before, but
+                    %using learning_coefficient_iteration
+                    ENSEMBLE_variables = fieldnames(tile.ENSEMBLE.STATVAR);
+                    for i=1:size(ENSEMBLE_variables)
+                        if any(strcmp(ENSEMBLE_variables{i,1}, da.PARA.ensemble_variables)) 
+                            %find out if that variable is to be optimized by this DA class and check learning coefficient if this ensemble member is supposed to learn
+                            if any(strcmp(tile.ENSEMBLE.PARA.gaussian_variables_name, ENSEMBLE_variables{i,1})) %gaussian variable
+                                pos = find(strcmp(tile.ENSEMBLE.PARA.gaussian_variables_name, ENSEMBLE_variables{i,1}));
+                                if da.PARA.learning_coefficient_iteration >= rand() %carry the information from the DA step into the future 
+                                    tile.ENSEMBLE.PARA.gaussian_variables_center(pos,1) = sum(da.ENSEMBLE.ensemble_param(i,:) .* da.ENSEMBLE.weights);
+                                    if effective_ensemble_size >= 3
+                                        a = round(da.ENSEMBLE.weights .* da.TILE.PARA.ensemble_size.*100);
+                                        b=[];
+                                        for k=1:length(a)
+                                            b=[b repmat(da.ENSEMBLE.ensemble_param(i,k), 1, a(1,k))];
+                                        end
+                                        tile.ENSEMBLE.PARA.gaussian_variables_width(pos,1) = std(b);
+                                    else
+                                        tile.ENSEMBLE.PARA.gaussian_variables_width(pos,1) = tile.ENSEMBLE.PARA.gaussian_variables_width(pos,1)/2; %make reduction factor a PARA 
+                                    end
+                                else %go back to the previous values 
+                                    tile.ENSEMBLE.PARA.gaussian_variables_center(pos,1) = da.TEMP.old_ensemble.(ENSEMBLE_variables{i,1}).gaussian_variables_center;
+                                    tile.ENSEMBLE.PARA.gaussian_variables_width(pos,1) = da.TEMP.old_ensemble.(ENSEMBLE_variables{i,1}).gaussian_variables_width;
+                                end
+                            end
+                            if any(strcmp(tile.ENSEMBLE.PARA.boxcar_variables_name, ENSEMBLE_variables{i,1})) %boxcar variable
+                                pos = find(strcmp(tile.ENSEMBLE.PARA.boxcar_variables_name, ENSEMBLE_variables{i,1}));
+                                if da.PARA.learning_coefficient_iteration >= rand() %carry the information from the DA step into the future
+                                    if effective_ensemble_size <= 3
+                                        mean_value = sum(da.ENSEMBLE.ensemble_param(i,:) .* da.ENSEMBLE.weights);
+                                        range = tile.ENSEMBLE.PARA.boxcar_variables_upper_bound(pos,1) - tile.ENSEMBLE.PARA.boxcar_variables_lower_bound(pos,1);
+                                        tile.ENSEMBLE.PARA.boxcar_variables_lower_bound(pos,1) = mean_value - range/4; %make reduction factor a PARA 
+                                        tile.ENSEMBLE.PARA.boxcar_variables_upper_bound(pos,1) = mean_value + range/4;
+                                    else
+                                        valid_pos = find(da.ENSEMBLE.weights(1,:) > 1./(100.*da.TILE.PARA.ensemble_size));
+                                        mini = min(da.ENSEMBLE.ensemble_param(i,valid_pos));
+                                        maxi = max(da.ENSEMBLE.ensemble_param(i,valid_pos));
+                                        range = maxi-mini;
+                                        tile.ENSEMBLE.PARA.boxcar_variables_lower_bound(pos,1) = mini - range/4;
+                                        tile.ENSEMBLE.PARA.boxcar_variables_upper_bound(pos,1) = maxi + range/4;  %make reduction factor a PARA 
+                                    end
+                                else
+                                    tile.ENSEMBLE.PARA.boxcar_variables_lower_bound(pos,1) = da.TEMP.old_ensemble.(ENSEMBLE_variables{i,1}).boxcar_variables_lower_bound;
+                                    tile.ENSEMBLE.PARA.boxcar_variables_upper_bound(pos,1) = da.TEMP.old_ensemble.(ENSEMBLE_variables{i,1}).boxcar_variables_upper_bound;
+                                end
+                            end
+                        end
+                    end
                     da.TILE.ENSEMBLE = recalculate_ensemble_parameters_after_DA(da.TILE.ENSEMBLE, tile, da.PARA.ensemble_variables);
-
+                    
                     %reset timestamps, no need to reset timestamps in the
                     %CG stratigraphy since the old states are read in
                     tile.t = da.TEMP.last_assimilation_date;
@@ -348,18 +383,13 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
                     
                     da.DA_TIME = min(da.TEMP.time_next_obs);
                     tile.OUT = reset_timestamp_out(tile.OUT,tile);
-                end
-                if da.PARA.recalculate_stratigraphy ==1
-                    da.TEMP.recalculate_stratigraphy_now = 1;
+                    
                 end
             end
             
         end
         
-        
-        
         function da = PBS(da)
-           % w = PBS( HX,Y,R )
             % Efficient implementation of the Particle Batch Smoother
             % presented in Margulis et al. (2015; JHM).
             % N.B. The observation errors are assumed to be uncorrelated (diagonal R)
@@ -394,6 +424,8 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
             %
             % Code by Kristoffer Aalstad (Feb. 2019)
             
+            
+            
             % Calculate the diagonal of the inverse obs. error covariance.
             observations = [];
             obs_variance = [];
@@ -406,6 +438,17 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
             
             No=size(observations,1);
             Rinv=(obs_variance').^(-1);
+%             if numel(da.STATVAR.obs_error_variance{1,1})==No
+%                 if size(da.STATVAR.obs_error_variance{1,1},2)==No
+%                     Rinv=da.STATVAR.obs_error_variance{1,1}.^(-1);
+%                 else
+%                     Rinv=(da.STATVAR.obs_error_variance{1,1}').^(-1);
+%                 end
+%             elseif numel(da.STATVAR.obs_error_variance{1,1})==1
+%                 Rinv=(1/da.STATVAR.obs_error_variance{1,1}).*ones(1,No);
+%             else
+%                 error('Expected numel(R)=No or scalar R')
+%             end
             
             % Calculate the likelihood.
             Inn=repmat(observations,1,size(da.ENSEMBLE.modeled_obs,2))-da.ENSEMBLE.modeled_obs;   % Innovation.
@@ -426,7 +469,7 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
             
             % Need "log-sum-exp" trick to overcome numerical issues for small R/large
             % number of obs.
-            da.ENSEMBLE.effective_ensemble_size = 1./sum(da.ENSEMBLE.weights.^2);
+            
         end
             
             
@@ -459,97 +502,6 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
             end
         end
         
-        function da = adaptive_PBS(da)
-            %[w,Neff]= AdaPBS( Ypred, yobs, R, prim, pricov, proposal )
-            % An Adaptive Particle Batch Smoother using a Gaussian proposal
-            % N.B. The observation errors are assumed to be uncorrelated (diagonal R)
-            % and Gaussian. This can easily be changed.
-            %
-            % Dimensions: No = Number of observations in the batch to assimilate.
-            %             Np = Number of parameters to update.
-            %             Ne = Number of ensemble members (particles).
-            %
-            % -----------------------------------------------------------------------
-            % Inputs:
-            %
-            %
-            % Ypred   => No x Ne matrix containing an ensemble of Ne predicted
-            %         observation column vectors each with No entries.
-            %
-            % y     => No x 1 vector containing the batch of (unperturbed) observations.
-            %
-            % R     => No x 1 observation error variance vector; this may also be
-            %         specified as a scalar corresponding to the constant variance of
-            %         all the observations in the case that these are all from the same
-            %         instrument.
-            % prim  => Np x 1 Prior mean vector.
-            %
-            % pricov => Np x Np Prior covariance matrix of the paramters - typically
-            % diagonal matrix w. variances of each parameter
-            %
-            % proposal => Np x Ne Samples from the proposal (assumed to be Gaussian) -
-            % comes out of the loop
-            %
-            % -----------------------------------------------------------------------
-            % Outputs:
-            %
-            % w     => 1 x Ne vector containing the ensemble of posterior weights,
-            %         the prior weights are implicitly 1/N_e.
-            %
-            % -----------------------------------------------------------------------
-            % See e.g. https://jblevins.org/log/log-sum-exp for underflow issue.
-            %
-            % Code by Kristoffer Aalstad (June 2023)
-
-            
-            observations = [];
-            obs_variance = [];
-            for i=1:size(da.STATVAR.observations,1)
-                observations = [observations; da.STATVAR.observations{i,1}(da.TEMP.first_obs_index(i,1):da.TEMP.index_next_obs(i,1)-1,1)];
-                obs_variance = [obs_variance; da.STATVAR.obs_variance{i,1}(da.TEMP.first_obs_index(i,1):da.TEMP.index_next_obs(i,1)-1,1)];
-            end
-            da.ENSEMBLE.observations = observations;
-            da.ENSEMBLE.obs_variance = obs_variance;
-            
-            No=size(observations,1);
-            Rinv=(obs_variance').^(-1);
-            
-            proposal = da.ENSEMBLE.value_gaussian;
-            prim = da.TEMP.old_mean_gaussian;
-            pricov = diag(da.TEMP.old_std_gaussian);
-            
-           % None of these three exist yet, compute here!
-            % Prior term
-            A0=proposal-prim;
-            Phi0=-0.5.*(A0')*(pricov\A0);
-            Phi0=diag(Phi0);
-            Phi0=Phi0';
-
-            % Proposal term
-            A=proposal-mean(proposal,2);
-            propcov=(1./da.TILE.PARA.ensemble_size).*(A*A');
-            Phip=-0.5.*(A')*(propcov\A);
-            Phip=diag(Phip);
-            Phip=Phip';
-
-            % Likelihood term
-            residual = repmat(observations,1,size(da.ENSEMBLE.modeled_obs,2))-da.ENSEMBLE.modeled_obs; 
-            Phid=-0.5.*Rinv*(residual.^2);
-
-            Phi=Phid+Phi0-Phip;
-            Phimax=max(Phi);
-            Phis=Phi-Phimax; % Scaled to avoid numerical overflow (see Chopin book).
-
-            w=exp(Phis);
-            w=w./sum(w);
-
-            Neff=1./(sum(w.^2));
-
-            da.ENSEMBLE.weights = w;
-            da.ENSEMBLE.effective_ensemble_size = Neff;
-        end
-
-        
         
         function data_package = pack(da, data_package, var_name, var) %transform into column vector ready to send
                 %variables{i,1}
@@ -577,8 +529,6 @@ classdef DA_iterative_particle_batch_smoother < matlab.mixin.Copyable
             end
             
             save([tile.PARA.result_path da.TEMP.run_name '/tile_' num2str(da.TILE.PARA.worker_number) '.mat'], 'state');
-            
-            labBarrier;
 
         end
 

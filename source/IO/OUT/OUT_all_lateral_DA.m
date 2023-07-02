@@ -160,10 +160,15 @@ classdef OUT_all_lateral_DA < matlab.mixin.Copyable
         end
         
         function out = reset_timestamp_out(out,tile)
-            delete_timestamps = find(out.TIMESTAMP(1,:)>tile.t);
-            out.STRATIGRAPHY(:,delete_timestamps) = [];
-            out.LATERAL(:,delete_timestamps) = [];
-            out.TIMESTAMP(:,delete_timestamps) = [];
+            if size(out.TIMESTAMP,2)>0
+                delete_timestamps = find(out.TIMESTAMP(1,:)>tile.t);
+                if ~isempty(delete_timestamps)
+                    out.STRATIGRAPHY(:,delete_timestamps) = [];
+                    out.LATERAL(:,delete_timestamps) = [];
+                    out.TIMESTAMP(:,delete_timestamps) = [];
+                    out.MISC(:,delete_timestamps) = [];
+                end
+            end
             out.OUTPUT_TIME = tile.t + out.PARA.output_timestep;
         end
         

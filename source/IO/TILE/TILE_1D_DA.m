@@ -111,6 +111,17 @@ classdef TILE_1D_DA < matlab.mixin.Copyable
         function tile = data_assimilation(tile)
             for i = 1:size(tile.DA, 1)
                 tile.DA{i,1} = DA_step(tile.DA{i,1}, tile);
+                %recalculate stratigraphy
+                if tile.DA{i,1}.TEMP.recalculate_stratigraphy_now == 1 %set in DA class
+                    tile.DA{i,1}.TEMP.recalculate_stratigraphy_now = 0;
+                    tile = recalculate_stratigraphy(tile);
+                    %reset observation operators if necessary
+                    for j=1:size(tile.DA, 1)
+                        for k=1:size(tile.DA{j,1}.OBS_OP,1)
+                            tile.DA{j,1}.OBS_OP{k,1} = reset_new_stratigraphy(tile.DA{j,1}.OBS_OP{k,1}, tile);
+                        end
+                    end
+                end
             end
         end
         
@@ -576,6 +587,17 @@ classdef TILE_1D_DA < matlab.mixin.Copyable
             variables = fieldnames(temp.out.STRATIGRAPHY);
             for i=1:size(variables,1)
                 tile.(variables{i,1}) = temp.out.STRATIGRAPHY.(variables{i,1});
+            end
+        end
+        
+        
+        %re-initialize the stratigraphy based on the new ENSEMBLE class
+        %which updates the STRATIGRAPHY class, and the 
+        function tile = recalculate_stratigraphy(tile)
+            CURRENT = tile.TOP.NEXT;
+            while ~isequal(CURRENT, tile.BOTTOM)
+                CURRENT = adjust_stratigraphy(CURRENT, tile);
+                CURRENT = CURRENT.NEXT;
             end
         end
 

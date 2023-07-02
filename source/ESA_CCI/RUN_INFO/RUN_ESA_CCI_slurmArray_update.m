@@ -34,7 +34,7 @@ classdef RUN_ESA_CCI_slurmArray_update < matlab.mixin.Copyable
             run_info.PARA.projection_class = [];
             run_info.PARA.projection_class_index = [];
 
-            
+            run_info.PARA.save_spatial_reference_folder = [];
         end
         
         function run_info = provide_CONST(run_info)
@@ -72,7 +72,8 @@ classdef RUN_ESA_CCI_slurmArray_update < matlab.mixin.Copyable
             run_info.SPATIAL = finalize_init(run_info.SPATIAL);
             
             if ~(exist([run_info.PPROVIDER.PARA.result_path run_info.PARA.run_name '/'] )==7)
-                mkdir([run_info.PPROVIDER.PARA.result_path run_info.PARA.run_name '/'])
+                %mkdir([run_info.PPROVIDER.PARA.result_path run_info.PARA.run_name '/'])
+                mkdir([run_info.PARA.save_spatial_reference_folder run_info.PARA.run_name '/'])
             end
             if run_info.PARA.worker_number == 1
 
@@ -81,7 +82,8 @@ classdef RUN_ESA_CCI_slurmArray_update < matlab.mixin.Copyable
                 spatial_reference.ACTION = [];
                 spatial_reference.PARA.result_path = run_info.PPROVIDER.PARA.result_path;
                 spatial_reference.PARA.run_name = run_info.PARA.run_name;
-                save([run_info.PPROVIDER.PARA.result_path run_info.PARA.run_name '/' run_info.PARA.run_name '.mat'], 'spatial_reference')
+               % save([run_info.PPROVIDER.PARA.result_path run_info.PARA.run_name '/' run_info.PARA.run_name '.mat'], 'spatial_reference')
+                save([run_info.PARA.save_spatial_reference_folder run_info.PARA.run_name '/' run_info.PARA.run_name '.mat'], 'spatial_reference')
                 spatial_reference = [];
                 
             end
