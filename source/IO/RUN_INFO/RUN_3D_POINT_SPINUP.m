@@ -72,7 +72,7 @@ classdef RUN_3D_POINT_SPINUP < matlab.mixin.Copyable
             parpool(run_info.SPATIAL.PARA.number_of_tiles)
             spmd
                 run_info.PARA.worker_number = labindex; %->NEEDS TWO DIFFERENT VARIABLES, ONE THE ACTUAL WORKER NUMBER AND THE OTHER ONE THE NUMBER IN THE 3D_POINT CLASS
-                [run_info, tile] = setup_run(run_info);
+                [run_info] = setup_run(run_info);
                 
                 for i=1:size(run_info.PARA.tile_class,1)
                     disp(['running tile number ' num2str(i)])
@@ -81,11 +81,18 @@ classdef RUN_3D_POINT_SPINUP < matlab.mixin.Copyable
                         
                         new_tile = copy(run_info.PPROVIDER.CLASSES.(run_info.PARA.tile_class{i,1}){run_info.PARA.tile_class_index(i,1),1});
                         fn = fieldnames(run_info.SPATIAL.STATVAR);
-                        for k=1:size(fn,1)  %be careful, does not work if empty array (and not NaN) is willingly assigned to a parameter
-                            if ~isempty(run_info.SPATIAL.STATVAR.(fn{k,1}))
-                                new_tile.PARA.(fn{k,1}) = run_info.SPATIAL.STATVAR.(fn{k,1});
+                        for i=1:size(fn,1)
+                            if ~isempty(run_info.SPATIAL.STATVAR.(fn{i,1}))
+                                new_tile.PARA.(fn{i,1}) = run_info.SPATIAL.STATVAR.(fn{i,1})(run_info.PARA.worker_number,1);
                             end
                         end
+                        
+%                         fn = fieldnames(run_info.SPATIAL.STATVAR);
+%                         for k=1:size(fn,1)  %be careful, does not work if empty array (and not NaN) is willingly assigned to a parameter
+%                             if ~isempty(run_info.SPATIAL.STATVAR.(fn{k,1}))
+%                                 new_tile.PARA.(fn{k,1}) = run_info.SPATIAL.STATVAR.(fn{k,1});
+%                             end
+%                         end
                         new_tile.RUN_INFO = run_info;
                         new_tile = finalize_init(new_tile);
                         
@@ -103,7 +110,7 @@ classdef RUN_3D_POINT_SPINUP < matlab.mixin.Copyable
  
  
 
-        function [run_info, tile] = setup_run(run_info)
+        function [run_info] = setup_run(run_info)
             %update the worker-specific name of the parameter file and the run
             run_info.PPROVIDER = update_parameter_file(run_info.PPROVIDER, run_info.SPATIAL.PARA.param_file_number(run_info.PARA.worker_number,1));
             run_info.PPROVIDER = update_run_name(run_info.PPROVIDER, run_info.PARA.worker_number);
