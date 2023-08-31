@@ -389,6 +389,10 @@ classdef GROUND_freezeC_RichardsEqW_Xice_seb < SEB & HEAT_CONDUCTION & FREEZE_CU
             [saturated_next, hardBottom_next] = get_saturated_hardBottom_first_cell_Xice(ground, lateral);
         end
         
+        function ground = lateral3D_pull_water_overland_flow(ground, lateral)
+            ground = lateral3D_pull_water_overland_flow_XICE(ground, lateral);
+        end
+        
         %LAT3D_WATER_RESERVOIR and LAT3D_WATER_SEEPAGE_FACE do not require specific functions
         
         %-------LAT3D_HEAT-------------            

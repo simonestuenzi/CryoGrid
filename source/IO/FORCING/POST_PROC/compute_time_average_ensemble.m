@@ -65,7 +65,7 @@ classdef compute_time_average_ensemble < FORCING_base
         
         
         function forcing = post_process(post_proc, forcing, tile)
-            
+
             data_full = forcing.DATA;
             forcing.DATA = [];
             forcing.DATA.snowfall = [];
@@ -117,8 +117,63 @@ classdef compute_time_average_ensemble < FORCING_base
             forcing.TEMP.wind = 0;
             forcing.TEMP.rainfall = 0;
             forcing.TEMP.snowfall = 0;
+            
+            forcing.DATA.full_res_data = data_full;
         end
         
+        
+        function forcing = post_process_adjust_forcing(post_proc, forcing, tile)
+
+            data_full = forcing.DATA.full_res_data;
+            forcing.DATA = [];
+            forcing.DATA.snowfall = [];
+            forcing.DATA.rainfall = [];
+            forcing.DATA.Tair = [];
+            forcing.DATA.wind = [];
+            forcing.DATA.q = [];
+            forcing.DATA.p = [];
+            forcing.DATA.Lin = [];
+            forcing.DATA.Sin = [];
+            forcing.DATA.timeForcing = [];
+            
+            for i = data_full.timeForcing(1,1):post_proc.PARA.averaging_period:data_full.timeForcing(end,1)-post_proc.PARA.averaging_period
+                range = find(data_full.timeForcing>=i & data_full.timeForcing < min(data_full.timeForcing(end,1), i + post_proc.PARA.averaging_period));
+                forcing.DATA.timeForcing = [forcing.DATA.timeForcing; mean(data_full.timeForcing(range,1))];
+                forcing.DATA.Tair = [forcing.DATA.Tair; mean(data_full.Tair(range,1)) + post_proc.PARA.absolute_change_Tair];
+                forcing.DATA.wind = [forcing.DATA.wind; mean(data_full.wind(range,1))];
+                forcing.DATA.q = [forcing.DATA.q; mean(data_full.q(range,1))];
+                forcing.DATA.p = [forcing.DATA.p; mean(data_full.p(range,1))];
+
+                sky_emissivity = data_full.Lin(range,1) ./ (data_full.Tair(range,1)+273.15).^4 ./ post_proc.CONST.sigma;
+                forcing.DATA.Lin = [forcing.DATA.Lin; mean(sky_emissivity .* post_proc.CONST.sigma .* (data_full.Tair(range,1) + 273.15 + post_proc.PARA.absolute_change_Tair).^4)];
+                forcing.DATA.Sin = [forcing.DATA.Sin; mean(data_full.Sin(range,1) .*  (1+post_proc.PARA.relative_change_Sin))];
+                
+                sf = 0;
+                rf = 0;
+                for j=1:size(range,1)
+                    precip = data_full.snowfall(range(j),1) + data_full.rainfall(range(j),1);
+                    factor = max(0, min(1, (data_full.Tair(range(j),1) + post_proc.PARA.absolute_change_Tair - post_proc.PARA.all_snow_T) ./ max(1e-12, (post_proc.PARA.all_rain_T - post_proc.PARA.all_snow_T))));
+                    sf = sf + precip.*(1 - factor);
+                    rf = rf + precip.*factor;
+                end
+                forcing.DATA.snowfall = [forcing.DATA.snowfall; sf./size(range,1) .* post_proc.PARA.snow_fraction];
+                forcing.DATA.rainfall = [forcing.DATA.rainfall; rf./size(range,1) .* post_proc.PARA.rain_fraction];
+                                
+            end
+            
+            %overwrite target variables in TEMP in FORCING
+            forcing.TEMP = [];
+            forcing.TEMP.Lin = 0;
+            forcing.TEMP.Sin = 0;
+            forcing.TEMP.q = 0;
+            forcing.TEMP.p = 0;
+            forcing.TEMP.Tair = 0;
+            forcing.TEMP.wind = 0;
+            forcing.TEMP.rainfall = 0;
+            forcing.TEMP.snowfall = 0;
+            
+            forcing.DATA.full_res_data = data_full;
+        end
         
 %                 %-------------param file generation-----
 %         function post_proc = param_file_info(post_proc)

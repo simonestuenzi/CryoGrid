@@ -1,4 +1,4 @@
-classdef OBS_MULTITILE_SCF_1D < matlab.mixin.Copyable
+classdef OBS_MULTITILE_SCF_ESA_CCI < matlab.mixin.Copyable
     
     properties
         PARA
@@ -23,9 +23,11 @@ classdef OBS_MULTITILE_SCF_1D < matlab.mixin.Copyable
         end
         
         function result = observable_operator(obs, tile) 
-
-            result = double(sum(tile.SUBSURFACE_CLASS.STATVAR.waterIce_snow,1)>1e-5);
-
+            
+            SWE = reshape(tile.SUBSURFACE_CLASS.STATVAR.SWE, tile.PARA.number_of_realizations, tile.ENSEMBLE.PARA.subgrid_ensemble_size, tile.ENSEMBLE.PARA.grid_ensemble_size);
+            result=squeeze(mean(double(SWE>1e-5),2));
+            result = result(:)';
+ 
         end
         
         function obs = reset_new_stratigraphy(obs, tile)

@@ -82,17 +82,10 @@ classdef OUT_MULTITILE_ESA_CCI_netcdf_monthly < matlab.mixin.Copyable
                     datapackage = reshape(datapackage, size(datapackage, 2) ./ tile.PARA.ensemble_size, 1, tile.PARA.ensemble_size);
 
                     datapackage = uint16( round( (datapackage - out.TEMP.scale_offset(i,1)) ./ out.TEMP.scale_factor(i,1) ) );
-                    fail_count = 0;
-                    while fail_count < 100
-                        try
-                            ncwrite([out.PARA.out_folder 'out_monthly_' num2str(tile.PARA.range(1,1)) '_' num2str(tile.PARA.range(end,1)) '.nc'], ...
-                                variable_names{i,1}, datapackage, [1 out.TEMP.date_count 1], [1 1 1]);
-                            fail_count = 200;
-                        catch
-                            pause(10)
-                            fail_count = fail_count + 1;
-                        end
-                    end
+
+                    ncwrite([out.PARA.out_folder 'out_monthly_' num2str(tile.PARA.range(1,1)) '_' num2str(tile.PARA.range(end,1)) '.nc'], ...
+                        variable_names{i,1}, datapackage, [1 out.TEMP.date_count 1], [1 1 1]);
+
                 end
 
                 out.TEMP.date_count = out.TEMP.date_count + 1;

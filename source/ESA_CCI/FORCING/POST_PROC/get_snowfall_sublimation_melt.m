@@ -7,7 +7,7 @@
 %
 %========================================================================
 
-classdef get_snowfall_melt < FORCING_base 
+classdef get_snowfall_sublimation_melt < FORCING_base 
     
     properties
         
@@ -25,6 +25,8 @@ classdef get_snowfall_melt < FORCING_base
             
             post_proc.PARA.Tr=274.15; % Threshold temperature for rainfall.
             post_proc.PARA.Ts=272.15; % Threshold tempearture for snowfall.
+            
+ 
 
             post_proc.PARA.emissivity_snow = 0.99; % Snow emissivity (assumed known).
             
@@ -38,7 +40,7 @@ classdef get_snowfall_melt < FORCING_base
             post_proc.PARA.albsmax_forest=0.6; % Maximum snow albedo.
             post_proc.PARA.albsmin_forest=0.3; % Minimum snow albedo.
             
-            post_proc.PARA.ar=0.2/1e2 .* 3.34e8 ./ (24.*3600); % Restricted degree day factor (m*degC/day , value from Burbaker et al. 1996) CHANGED, unit is correct now, converted to energy
+            post_proc.PARA.ar=0.2/1e2 .* 3.34e8 ./ (24.*3600); % Restricted degree day factor (m*degC/day , value from Burbaker et al. 1996)
             
             post_proc.PARA.canopy_transmissivity = 0.3;
             post_proc.PARA.emissivity_canopy = 0.96;
@@ -73,9 +75,14 @@ classdef get_snowfall_melt < FORCING_base
             
             if forcing.TEMP.current_year >= post_proc.PARA.year_range(1) && forcing.TEMP.current_year <= post_proc.PARA.year_range(end)
                 pos_year = forcing.TEMP.current_year - (forcing.PARA.ERA_data_years(1)- forcing.PARA.number_of_spin_up_years) + 1 - post_proc.TEMP.offset_years;
-                snowfall = get_snowfall(post_proc, tile);
+                [snowfall, rainfall] = get_snowfall(post_proc, tile);
                 for i=1:floor(365./post_proc.PARA.averaging_period)+1
                     forcing.DATA.ERA_snowfall_downscaled(:,i,pos_year) = nanmean(snowfall(:, (i-1).*post_proc.PARA.averaging_period.*4+1:min(i*post_proc.PARA.averaging_period*4, size(snowfall,2))),2);
+                    forcing.DATA.ERA_rainfall_downscaled(:,i,pos_year) = nanmean(rainfall(:, (i-1).*post_proc.PARA.averaging_period.*4+1:min(i*post_proc.PARA.averaging_period*4, size(rainfall,2))),2);
+                end
+                sublimation = get_sublimation(post_proc, tile);
+                for i=1:floor(365./post_proc.PARA.averaging_period)+1
+                    forcing.DATA.ERA_sublimation_downscaled(:,i,pos_year) = nanmean(sublimation(:, (i-1).*post_proc.PARA.averaging_period.*4+1:min(i*post_proc.PARA.averaging_period*4, size(sublimation,2))),2);
                 end
                 post_proc.STATVAR.ERA_snowfall_downscaled = snowfall; %needed to get albedo for melt
                 [melt_depth_bare, melt_depth_forest] = get_melt_SEB(post_proc, tile);
@@ -83,9 +90,11 @@ classdef get_snowfall_melt < FORCING_base
                     forcing.DATA.ERA_melt_bare(:,i,pos_year) = nanmean(melt_depth_bare(:, (i-1).*post_proc.PARA.averaging_period+1:min(i*post_proc.PARA.averaging_period, size(melt_depth_bare,2))),2);
                     forcing.DATA.ERA_melt_forest(:,i,pos_year) = nanmean(melt_depth_forest(:, (i-1).*post_proc.PARA.averaging_period+1:min(i*post_proc.PARA.averaging_period, size(melt_depth_forest,2))),2);
                 end
-                forcing.DATA.ERA_melt_bare(forcing.DATA.ERA_melt_bare<0) = 0;
-                forcing.DATA.ERA_melt_forest(forcing.DATA.ERA_melt_forest<0) = 0;
+                %forcing.DATA.ERA_melt_bare(forcing.DATA.ERA_melt_bare<0) = 0;
+                %forcing.DATA.ERA_melt_forest(forcing.DATA.ERA_melt_forest<0) = 0;
                 snowfall = [];
+                rainfall = [];
+                sublimation = [];
                 melt_depth_bare = [];
                 melt_depth_forest = [];
             end
@@ -94,16 +103,30 @@ classdef get_snowfall_melt < FORCING_base
         
         
         %service functions
-        function snowfall = get_snowfall(post_proc, tile)
+        function [snowfall, rainfall] = get_snowfall(post_proc, tile)
 
             frain = (tile.FORCING.TEMP.ERA_T_downscaled-post_proc.PARA.Ts)./(post_proc.PARA.Tr-post_proc.PARA.Ts);  % Rain fraction.
             frain(frain>1)=1; 
             frain(frain<0)=0; % Must be between 0 and 1.
             snowfall = (1-frain) .* tile.FORCING.TEMP.ERA_precip_downcaled; % mm/day
             snowfall = snowfall .* double(tile.FORCING.TEMP.ERA_T_downscaled~=0);
-
+            rainfall = frain .* tile.FORCING.TEMP.ERA_precip_downcaled; % mm/day
+            rainfall = rainfall .* double(tile.FORCING.TEMP.ERA_T_downscaled~=0);
         end
         
+        function sublimation = get_sublimation(post_proc, tile)
+            %for wind speed 1m/sec, scale this in FORCING
+            kappa = 0.4;
+            z0 = 1e-3;
+            z=2;
+            rho_water = 1000;
+            psat = 6.112.* 100.* exp(22.46.*(min(273.15,tile.FORCING.TEMP.ERA_T_downscaled)-273.15)./(272.61-273.15 + (min(273.15,tile.FORCING.TEMP.ERA_T_downscaled)))); % tile.FORCING.TEMP.ERA_T_downscaled in K
+        
+            sublimation = 0.622 .* kappa.^2 .* psat .* (1 - tile.FORCING.TEMP.ERA_RH_downscaled) ./ (287.085 .* rho_water .* min(273.15,tile.FORCING.TEMP.ERA_T_downscaled) .* (log(z./z0)).^2);
+
+            %convert to mm/day!
+            sublimation = sublimation .* 1000 .* 24 .* 3600;
+        end
         
         function [melt_depth_bare, melt_depth_forest] = get_melt_SEB(post_proc, tile)
             melt_depth_bare = tile.FORCING.TEMP.ERA_Lin_downscaled(:, 1:size(tile.FORCING.TEMP.ERA_Lin_downscaled,2)/4) .* 0;

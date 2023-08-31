@@ -156,6 +156,25 @@ classdef OUT_all < matlab.mixin.Copyable
                 end
             end
         end
+        
+        function out = reset_timestamp_out(out,tile)
+            if size(out.TIMESTAMP,2)>0
+                delete_timestamps = find(out.TIMESTAMP(1,:)>tile.t);
+                if ~isempty(delete_timestamps)
+                    
+                    out.STRATIGRAPHY(:,delete_timestamps) = [];
+                    out.TIMESTAMP(:,delete_timestamps) = [];
+                    out.MISC(:,delete_timestamps) = [];
+                end
+            end
+            out.OUTPUT_TIME = tile.t + out.PARA.output_timestep;
+            if ~isnan(out.PARA.save_interval)
+                potential_save_time =  datenum([out.PARA.save_date num2str(str2num(datestr(out.SAVE_TIME,'yyyy')) - out.PARA.save_interval)], 'dd.mm.yyyy');
+                if tile.t <= potential_save_time
+                    out.SAVE_TIME = potential_save_time;
+                end
+            end
+        end
 
         %-------------param file generation-----
         function out = param_file_info(out)

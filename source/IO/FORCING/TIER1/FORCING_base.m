@@ -467,6 +467,18 @@ classdef FORCING_base < matlab.mixin.Copyable
             solar_zenith=(pi/2)-SunEl;
         end
         
+        function forcing = adjust_forcing(forcing, tile)
+            
+            %optional post-processing with dedicated classes
+            if ~isempty(forcing.PARA.post_proc_class) && sum(isnan(forcing.PARA.post_proc_class_index)) == 0
+                for i=1:size(forcing.PARA.post_proc_class,1)
+                    post_proc_class = copy(tile.RUN_INFO.PPROVIDER.CLASSES.(forcing.PARA.post_proc_class{i,1}){forcing.PARA.post_proc_class_index(i,1),1});
+                    forcing = post_process_adjust_forcing(post_proc_class, forcing, tile);
+                end
+            end
+        end
+
+        
     end
 
 end

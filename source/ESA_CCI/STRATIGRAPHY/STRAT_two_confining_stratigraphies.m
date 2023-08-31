@@ -15,7 +15,6 @@ classdef STRAT_two_confining_stratigraphies < matlab.mixin.Copyable
 		function strat = provide_PARA(strat) 
             strat.PARA.stratigraphy_fraction = [];
                         
-            strat.PARA.ensemble_size = 1;
             strat.PARA.strat_statvar_class1 = []; 
             strat.PARA.strat_statvar_class1_index = [];
             strat.PARA.strat_statvar_class2 = [];
@@ -34,7 +33,7 @@ classdef STRAT_two_confining_stratigraphies < matlab.mixin.Copyable
         function strat = finalize_init(strat, tile)
 			
             if size(strat.PARA.stratigraphy_fraction,2) == 1
-                strat.PARA.stratigraphy_fraction = repmat(strat.PARA.stratigraphy_fraction, 1, strat.PARA.ensemble_size);
+                strat.PARA.stratigraphy_fraction = repmat(strat.PARA.stratigraphy_fraction, 1, tile.PARA.ensemble_size);
             end
             
             %first grid cell/ensemble member
@@ -53,7 +52,7 @@ classdef STRAT_two_confining_stratigraphies < matlab.mixin.Copyable
                     end
             end
 
-            for i=2:strat.PARA.ensemble_size
+            for i=2:tile.PARA.ensemble_size
                 tile.GRID.STATVAR.MIDPOINTS = tile.GRID.STATVAR.midPoints(:,i);
                 tile.GRID.STATVAR.GRID = tile.GRID.STATVAR.depth(:,i);
                 strat_class1 = copy(tile.RUN_INFO.PPROVIDER.CLASSES.(strat.PARA.strat_statvar_class1){strat.PARA.strat_statvar_class1_index,1});

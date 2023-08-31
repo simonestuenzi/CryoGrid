@@ -232,7 +232,7 @@ classdef SEB < BASE
             ice_fraction = (seb.STATVAR.ice(1,1) + seb.STATVAR.Xice(1,1)) ./ (seb.STATVAR.waterIce(1,1) + seb.STATVAR.XwaterIce(1,1));
             
             rho = rho_air(seb, p, seb.STATVAR.T(1)+273.15);
-            sat_pressure_first_cell = water_fraction .* satPresWater(seb, seb.STATVAR.T(1)+273.15) + ice_fraction .* satPresWater(seb, seb.STATVAR.T(1)+273.15);
+            sat_pressure_first_cell = water_fraction .* satPresWater(seb, seb.STATVAR.T(1)+273.15) + ice_fraction .* satPresIce(seb, seb.STATVAR.T(1)+273.15);
             latent_heat = water_fraction .* latent_heat_evaporation(seb, seb.STATVAR.T(1)+273.15) + ice_fraction .* latent_heat_sublimation(seb, seb.STATVAR.T(1)+273.15);
 
             saturation_fraction_air_first_cell = exp(seb.STATVAR.waterPotential(1,1) .* seb.CONST.g ./ ((seb.CONST.R./ seb.CONST.molar_mass_w) .*(seb.STATVAR.T(1)+273.15)));

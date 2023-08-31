@@ -21,6 +21,7 @@ classdef GROUND_MULTITILE_ESA_CCI_SEB < SEB
             
             ground.PARA.wind_speed_class = [];
             ground.PARA.wind_compaction_timescale = [];
+            ground.PARA.water_table_depth = [];
             
             ground.PARA.field_capacity_snow = [];
 %             ground.PARA.water_table_depth = [];
@@ -411,7 +412,10 @@ classdef GROUND_MULTITILE_ESA_CCI_SEB < SEB
         end
         
         
-        
+        function ground = adjust_stratigraphy(ground, tile)
+            
+        end
+
         
         %----non-mandatory functions
         

@@ -33,7 +33,7 @@ classdef convert2ESA_CCI < FORCING_base
             post_proc.PARA.albsmax=0.85; % Maximum snow albedo.
             post_proc.PARA.albsmin=0.5; % Minimum snow albedo.
             
-            post_proc.PARA.ar=0.2/1e2; % Restricted degree day factor (m*degC/day , value from Burbaker et al. 1996)
+            post_proc.PARA.ar=0.2/1e2.* 3.34e8 ./ (24.*3600); % Restricted degree day factor (m*degC/day , value from Burbaker et al. 1996)
         end
         
         

@@ -5,7 +5,7 @@
 % dim2: annual 8d values; dim3: years
 %========================================================================
 
-classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
+classdef FORCING_MULTITILE_seb_CCI2 < matlab.mixin.Copyable
     
     properties
         PARA
@@ -44,7 +44,10 @@ classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
             forcing.PARA.start_time = [];
             forcing.PARA.end_time = [];
             
-            forcing.PARA.snowfall_factor = []; %comes from ensemble
+            forcing.PARA.snowfall_factor_grid = 1;  
+            forcing.PARA.snowfall_factor = []; %subgrid snowfall
+            forcing.PARA.sublimation_factor = 1; 
+            forcing.PARA.wind_speed_class = [];
             forcing.PARA.bare_forest_fraction = [];
         end
         
@@ -68,11 +71,11 @@ classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
             
             if ~forcing.PARA.preprocessed
                 
-                fail_count=0;
-                while fail_count < 100
-                    try
+%                 fail_count=0;
+%                 while fail_count < 100
+%                     try
                         %initialize DATA array to be populated
-                        variables = {'ERA_melt_bare'; 'ERA_melt_forest'; 'ERA_snowfall_downscaled'; 'ERA_T_downscaled'; 'final_av_T'; 'final_MODIS_weight'};
+                        variables = {'ERA_melt_bare'; 'ERA_melt_forest'; 'ERA_snowfall_downscaled'; 'ERA_rainfall_downscaled'; 'ERA_sublimation_downscaled'; 'ERA_T_downscaled'; 'final_av_T'; 'final_MODIS_weight'};
                         for i=1:size(variables,1)
                             forcing.DATA.(variables{i,1}) = single(zeros(size(tile.PARA.latitude,1), 46,  forcing.PARA.ERA_data_years(end) - forcing.PARA.ERA_data_years(1) + 1 + forcing.PARA.number_of_spin_up_years));
                         end
@@ -155,6 +158,7 @@ classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
                             forcing.TEMP.ERA_Lin_downscaled = single(zeros(size(tile.PARA.latitude,1),number_of_values));
                             forcing.TEMP.ERA_Sin_downscaled = single(zeros(size(tile.PARA.latitude,1),number_of_values));
                             forcing.TEMP.ERA_precip_downcaled=single(zeros(size(tile.PARA.latitude,1),number_of_values));
+                            forcing.TEMP.ERA_RH_downscaled = single(zeros(size(tile.PARA.latitude,1),number_of_values));
                             
                             %code below crashes when reading full year in case of too many grid cells -> reduce read_chunk_size depending on number of ERA grid cells
                             read_chunk_size_max = ceil((datenum(current_year+1,1,1)-datenum(current_year,1,1))./2); % in days, make dependent on size of ERA area, smaller when ERA area is big to avoid overflow
@@ -366,6 +370,7 @@ classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
                                         forcing.TEMP.ERA_T_downscaled(:,count+i) = T_downscaled;
                                         forcing.TEMP.ERA_Lin_downscaled(:,count+i) = Lin_downscaled;
                                         forcing.TEMP.ERA_Sin_downscaled(:,count+i) = Sin_downscaled;
+                                        forcing.TEMP.ERA_RH_downscaled(:,count+i) = RH_downscaled ./ 100;
                                     end
                                     
                                     %precip
@@ -407,14 +412,14 @@ classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
                                 end
                             end
                             
-                        end
-                        fail_count = 200;
-                    catch
-                        fail_count = fail_count+1;
-                    end
-                    if fail_count == 100
-                        dkflkdwf
-                    end
+%                         end
+%                         fail_count = 200;
+%                     catch
+%                         fail_count = fail_count+1;
+%                     end
+%                     if fail_count == 100
+%                         dkflkdwf
+%                     end
                     toc
                 end
                 
@@ -441,7 +446,7 @@ classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
                 end
                 
                 forcing.DATA = tile.RUN_INFO.PPROVIDER.STORAGE.FORCING_MULTITILE_seb_CCI.DATA;
-                variables = {'ERA_melt_bare'; 'ERA_melt_forest'; 'ERA_snowfall_downscaled'; 'ERA_T_downscaled'; 'final_av_T'; 'final_MODIS_weight'};
+                variables = {'ERA_melt_bare'; 'ERA_melt_forest'; 'ERA_snowfall_downscaled'; 'ERA_rainfall_downscaled'; 'ERA_sublimation_downscaled'; 'ERA_T_downscaled'; 'final_av_T'; 'final_MODIS_weight'};
             end
             
             %------------------------------------------
@@ -487,6 +492,8 @@ classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
         
         
         %interpolate the actual forcing field DATA based on tile.t
+        %this is actually the same as a PERTURB CLASS, converting the
+        %"ensemble-free" forcing data to the ensemble
         function forcing = interpolate_forcing(forcing, tile)
             
             forcing.TEMP.surfT = double((forcing.DATA.final_av_T(:,forcing.TEMP.index) + forcing.TEMP.fraction./forcing.TEMP.number_of_substeps .* ...
@@ -495,7 +502,15 @@ classdef FORCING_MULTITILE_seb_CCI < matlab.mixin.Copyable
             
             forcing.TEMP.snowfall = double((forcing.DATA.ERA_snowfall_downscaled(:,forcing.TEMP.index) + forcing.TEMP.fraction./forcing.TEMP.number_of_substeps .* ...
                 (forcing.DATA.ERA_snowfall_downscaled(:, forcing.TEMP.index+1) - forcing.DATA.ERA_snowfall_downscaled(:, forcing.TEMP.index)))');
-            forcing.TEMP.snowfall = repmat(forcing.TEMP.snowfall, 1, tile.PARA.ensemble_size) .* forcing.PARA.snowfall_factor;
+            forcing.TEMP.snowfall = repmat(forcing.TEMP.snowfall, 1, tile.PARA.ensemble_size) .* forcing.PARA.snowfall_factor_grid .* forcing.PARA.snowfall_factor;
+
+            forcing.TEMP.rainfall = double((forcing.DATA.ERA_rainfall_downscaled(:,forcing.TEMP.index) + forcing.TEMP.fraction./forcing.TEMP.number_of_substeps .* ...
+                (forcing.DATA.ERA_rainfall_downscaled(:, forcing.TEMP.index+1) - forcing.DATA.ERA_rainfall_downscaled(:, forcing.TEMP.index)))');
+            forcing.TEMP.rainfall = repmat(forcing.TEMP.rainfall, 1, tile.PARA.ensemble_size);
+            
+            forcing.TEMP.sublimation = double((forcing.DATA.ERA_sublimation_downscaled(:,forcing.TEMP.index) + forcing.TEMP.fraction./forcing.TEMP.number_of_substeps .* ...
+                (forcing.DATA.ERA_sublimation_downscaled(:, forcing.TEMP.index+1) - forcing.DATA.ERA_sublimation_downscaled(:, forcing.TEMP.index)))');
+            forcing.TEMP.sublimation = repmat(forcing.TEMP.sublimation, 1, tile.PARA.ensemble_size) .* forcing.PARA.wind_speed_class .* max(0,forcing.PARA.sublimation_factor);
             
             melt_bare = double((forcing.DATA.ERA_melt_bare(:,forcing.TEMP.index) + forcing.TEMP.fraction./forcing.TEMP.number_of_substeps .* ...
                 (forcing.DATA.ERA_melt_bare(:, forcing.TEMP.index+1) - forcing.DATA.ERA_melt_bare(:, forcing.TEMP.index)))');
