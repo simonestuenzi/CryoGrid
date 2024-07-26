@@ -1,0 +1,2 @@
+Nyurba_Xice_conditions_2D_1: SPA veg 126 xice 3-5m
+Nyurba_Xice_conditions_2D_2: CHU bare 126 xice 5-7m
